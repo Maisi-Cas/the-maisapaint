@@ -1,0 +1,354 @@
+# MAISAPAINT.PY (Mejorado y con comentarios)
+
+# Librerias de Python
+import random as rand
+from typing import Literal
+import ctypes
+import os
+import json
+import msvcrt
+import time
+
+# Clases del motor
+import engine.graph as graph
+from engine.tile import Tile
+from engine.curse import Curse
+from engine.panel import Panel
+from engine.draw import Draw
+from engine.table import Table
+
+# Clases del nucleo
+from core.emitBus import bus
+from core.inputHandler import kInput
+import core.states as states
+
+# Clases/Recursos utiles (Estos 2 papuchos son los que mantienen el programa en funcionamiento)
+from utils.vector2 import Vector2 
+from utils.print2d import Print2D as print2d
+
+# Interfaz de usuario
+from ui.canvas import Canvas
+from ui.clock import Clock
+from ui.tileSelector import TileSelector
+from ui.textBox import TextBox
+from ui.selector import ColorSelector, CharacterSelector, StyleSelector
+
+
+# CLASE PRINCIPAL, LA CLASE DE CLASES, EL DIOS DE LA CLASE
+class Maisapaint:
+    # Tenia planeado hacer esta clase en otro archivo pero me dio paja y mejor la declare aca
+    class SplashText:
+        def __init__(self, position: Vector2, size: Vector2):
+            
+            print2d.clear()
+            chargeString = 'Cargando...'
+            time.sleep(0.01)
+            for i in range(len(chargeString)):
+                randNum = rand.randint(0, len(graph.ForeColors) - 2)
+                print(graph.ForeColors[randNum]['color'] + chargeString [i] + graph.Reset.STYLE, end='', flush=True)                
+                time.sleep(0.01)
+                
+            self.postion = position.copy()
+            self.size = size.copy()
+            
+            self.splashText = ""
+            
+            with open('data/splashTexts.json', 'r') as splashTexts:
+                self.splashText = rand.choice(json.load(splashTexts)['normal'])
+            
+            self.textBox = TextBox(self.postion.copy(), self.size.copy(), self.splashText, 2)
+            self.panel = Panel('Texto chistoso', 6, self.postion - 2, self.size.copy())
+            
+        def render(self):
+            self.panel.render()
+            self.textBox.render()
+    
+    class KeyTable:
+        def __init__(self, position: Vector2):
+            self.table = Table("Controles", 5, position.copy(), 2, 20)
+            self.table.setColSize([8,16])
+            self.table.setColors([7],[3,11])
+            self.table.setHeadings("Tecla", "Accion")
+            self.valueDict = {
+                'draw' : [
+                    ["W A S D", "MOVERSE"],
+                    ["J", "DIBUJAR"],
+                    ["K", "BORRAR"],
+                    ["Q E", "SELECCIONAR TILE"],
+                    ["F", "MODO SELECCION"],
+                    ["Z", "LIMPIAR DIBUJO"],
+                    ["X", "ALTERNAR DIBUJO RAPIDO"],
+                    ["Y", "SALIR"]
+                    
+                ],
+                'select' : [
+                    ["W S", "CAMBIAR SELECTOR"],
+                    ["A D", "CAMBIAR VALOR"],
+                    ["J", "AÑADIR TILE"],
+                    ["Q E", "SELECCIONAR TILE"],
+                    ["F", "MODO DIBUJO"],
+                    ["C", "CUSTOMIZAR CARACTER"],
+                    ["Y", "SALIR"]
+                    
+                ]
+            }
+            self.update()
+            
+        def update(self):
+            self.table.clear()
+            key = ''
+            match states.current:
+                case states.States.DRAW:
+                    key = 'draw'
+                case states.States.SELECTCOLOR:
+                    key = 'select'
+            
+            for i in self.valueDict[key]:
+                self.table.addContet(i[0], i[1])
+                
+        def render(self):
+            self.table.show()
+                    
+          
+    def __init__(self):
+        self.canRun = True
+        self.fastDrawMode = False
+        # Declaracion de los Paneles/Frames
+        self.superPanel = Panel(f"{graph.ForeColors[0]['color']}T{graph.ForeColors[5]['color']}H{graph.ForeColors[8]['color']}E{graph.ForeColors[2]['color']}#{graph.ForeColors[1]['color']}M{graph.ForeColors[2]['color']}a{graph.ForeColors[3]['color']}i{graph.ForeColors[4]['color']}s{graph.ForeColors[6]['color']}a{graph.ForeColors[7]['color']}p{graph.ForeColors[9]['color']}a{graph.ForeColors[10]['color']}i{graph.ForeColors[11]['color']}n{graph.ForeColors[12]['color']}t", rand.randint(0, 14), Vector2(0,0), Vector2(100,29))
+        self.mainpanel = Panel('Dibujo', 12, Vector2(28,4), Vector2(48,16))
+        self.tileSelector = TileSelector(Vector2(30,3), 16)
+        self.splashtext = self.SplashText(Vector2(3,3), Vector2(25,5))
+        self.selectorPanel = Panel(
+            'Selectores',
+            7,
+            Vector2(
+                self.mainpanel.margin.x,
+                self.mainpanel.margin.y + self.mainpanel.size.y + 2
+            ),
+            Vector2(
+                self.mainpanel.size.x,
+                6    
+            )
+        )
+        self.keytable = self.KeyTable(Vector2(self.splashtext.postion.x - 1, self.splashtext.postion.y + self.splashtext.size.y + 1))
+        # Lista que almacena los selectores tomando como referencia las cordenadas del objeto SelectorPanel
+        self.selectors = [
+            ColorSelector(Vector2(
+                self.selectorPanel.margin.x + 2,
+                self.selectorPanel.margin.y + 3
+                ),
+            'Fuente'
+            ),
+            CharacterSelector(
+                Vector2(
+                    self.selectorPanel.margin.x + 21,
+                    self.selectorPanel.margin.y + 3
+                ),
+            'Caracter'
+            ),
+            ColorSelector(Vector2(
+                self.selectorPanel.margin.x + 2,
+                self.selectorPanel.margin.y + 6
+                ),
+            'Fondo' 
+            ),
+            StyleSelector(Vector2(
+                self.selectorPanel.margin.x + 29,
+                self.selectorPanel.margin.y + 6
+                ),
+            'Estilo' 
+            )
+        ]
+        self.selectors[2].currentId = 15
+        self.currentSelector = 0
+        # Otras cosas
+        
+        self.clock = Clock(Vector2(self.selectorPanel.margin.x + 23, self.selectorPanel.margin.y + 6)) # Reloj
+        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, 1)
+        self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
+        """
+            A ver, abro esto para explicar algo sobre [self.SelectorPanelTile:Tile] y de [self.SelectorPanel.title:str]
+            Debí haber hecho una clase, pero soy tremendo vago y mejor aca declaré estas variables, ni que me fuera a morir
+            [self.SelectorPanelTile] : Es un objeto de tipo tile, este es el tile que se forma según los valores de los selectores
+            [self.SelectorPanel.title] : Pone el tile en el titulo, algo asi [$]Selectores
+        """
+        
+        # Curse y Draw, sin estos 2 papasotes, no hay dibujo
+        self.curse = Curse(
+            self.mainpanel.margin.copy(),
+            self.mainpanel.size.copy(),
+            Vector2(self.mainpanel.size.x // 2, self.mainpanel.size.y // 2)
+        )
+        self.curse.colorId = self.tileSelector.tiles[self.tileSelector.currenTile].foreColorId
+        self.draw = Draw(Vector2(self.mainpanel.margin.x + 1, self.mainpanel.margin.y + 1), self.mainpanel.size.copy())
+        
+        # Conectar señales
+        bus.conect('draw-tile', self.drawTile)
+        bus.conect('mp-stop', self.stop)
+        bus.conect('slct-move', self.select)
+        bus.conect('state-change', self.changeState)
+        bus.conect('erase-tile', self.eraseTile)
+        bus.conect('cstm-char', self.custimizeChar)
+        bus.conect('slct-tile-change', self.changeTile)
+        bus.conect('show-cmd-cursor', self.showCMDCurse)
+        bus.conect('slct-tile', self.updateCurse)
+        bus.conect('move-curse', self.fastDraw)
+        bus.conect('fast-mode', self.fastDrawModeToogle)
+       
+    # region Run  
+    # Funcion que corre el programa    
+    def run(self):
+        self.showCMDCurse(False) # Esto en teoria elimina el cursor del cmd, me sorprende que funcione, debo hacer la version Show
+        print2d.clear() # Escribe cls en CMD, es eso basicamente
+        while(self.canRun):
+            
+            states.isRendering = True #Esta cochinada la hice por que el reloj me jodia el ui
+            self.superPanel.render() #Renderiza el canvas padre siempre, sin importar el estado
+            
+            if not states.clockIsRendering:
+                # LA MAQUINA (de estados)
+                match states.current:
+                    case states.States.DRAW:
+                        # Solo renderiza
+                        
+                        self.selectorPanel.render()
+                        self.keytable.render()
+                        self.mainpanel.render(True) # Cuando le pones true al render de un panel, este hace un limpiado de pantalla local
+                        self.splashtext.render()
+                        self.tileSelector.render()
+                        for i in self.selectors:
+                            i.render()
+                        self.draw.render()
+                        self.curse.render()
+                        self.clock.render()
+                        
+                        states.isRendering = False # El tema del condenado reloj de los demonios
+                        kInput.inputHandler() # Entrada, aca le pones la tecla y reacciona
+                        
+                    case states.States.SELECTCOLOR: # Lo mismo que el otro caso de arriba pero con cosillas cambiadas
+                        self.selectorPanel.render()
+                        self.mainpanel.render()
+                        self.splashtext.render()
+                        self.keytable.render()
+                        self.tileSelector.render()
+                        for i in self.selectors:
+                            i.render()
+                        self.draw.render()
+                        self.curse.render()
+                        self.clock.render()
+                        states.isRendering = False
+                        
+                        kInput.inputHandler()
+                    
+    # endregion
+    # Esta cosa es lo que permite navegar por los selectores
+    def select(self, direction: Literal['u','d','l','r'] = 'r'):
+        
+        for i in self.selectors: #Deja a todos los selctores de color blanco
+            i.colorId = 12
+        
+        match direction:
+            # En el caso de [u] y [d], alternas de selector 
+            case 'u':
+                if self.currentSelector != 0:
+                    self.currentSelector -= 1
+                else:
+                    self.currentSelector = len(self.selectors) - 1
+            case 'd':
+                if self.currentSelector != len(self.selectors) - 1:
+                    self.currentSelector += 1
+                else:
+                    self.currentSelector = 0
+            # Y con [r] y [l], cambias el valor del selectoor
+            case 'r':
+                self.selectors[self.currentSelector].moveSelector('r')
+                
+            case 'l':
+                self.selectors[self.currentSelector].moveSelector('l')
+            
+        self.selectors[self.currentSelector].colorId = 2 # Deja el selector selccionado (XD) de color dorado
+        
+        # Y ya se aplican los cambios al selector de tiles
+        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
+        self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
+    
+    # Agrega un tile a la clase dibujo, tomando el tile del tileSelector y las posision del cusror                
+    def drawTile(self):
+        self.draw.addpixel(self.curse.position.copy(), self.tileSelector.tiles[self.tileSelector.currenTile].copy())
+    
+    # Borra owo    
+    def eraseTile(self):
+        self.draw.deletePixel(self.curse.position.x, self.curse.position.y)
+    
+    # En serio debo explicar que hace esta linea?    
+    def stop(self):
+        self.canRun = False
+
+    # Cuando se cambia el estado, configura unas cositas
+    def changeState(self, state: states.States.DRAW):
+        print2d.clear()
+        states.current = state
+        
+        match states.current:
+            case states.States.DRAW:
+                for i in self.selectors:
+                    i.colorId = 12 # Decolorar selectores
+                    
+            case states.States.SELECTCOLOR:
+                self.selectors[self.currentSelector].colorId = 2 # Colorear de dorado el selecor actual
+        
+        self.keytable.update()
+    
+    # CTRL + C, CTRL + V De israel gpt, ni idea que hacer pero me gusta
+    # Oculta o muestra el cursor del cms                
+    def showCMDCurse(self, value: bool):
+        class CursorInfo(ctypes.Structure):
+            _fields_ = [
+                ("size", ctypes.c_int),
+                ("visible", ctypes.c_byte),
+            ]
+
+        handle = ctypes.windll.kernel32.GetStdHandle(-11)
+
+        cursor = CursorInfo()
+        ctypes.windll.kernel32.GetConsoleCursorInfo(handle, ctypes.byref(cursor))
+
+        cursor.visible = value
+
+        ctypes.windll.kernel32.SetConsoleCursorInfo(handle, ctypes.byref(cursor))
+        
+    def setCMDSize(self, x, y): # En progreso
+        pass
+    
+    # Esta cosa se activa cuando customizas el caracter                    
+    def custimizeChar(self):
+        self.selectors[1].customize() # Customización
+        # Actualizar el selectorPanel ozy
+        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, 1)
+        self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
+        
+        print2d.clear() # Lo que nunca hacer, ya bañate w
+        
+    # Sus nombres son parecidos, pero esta función añade un tile al selector de tiles
+    # usando los valores del selector de valores, aunque le digo selectores    
+    def changeTile(self):
+        #Mucho texto
+        self.tileSelector.change(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
+        self.curse.colorId = self.tileSelector.tiles[self.tileSelector.currenTile].foreColorId
+        bus.emit('state-change', states.States.DRAW) # Cambia el estado a DIBUJO cuando termina
+    
+    # Actualiza el cursor    
+    def updateCurse(self, *args, **kwargs):
+        self.curse.colorId = self.tileSelector.tiles[self.tileSelector.currenTile].foreColorId
+    
+    # Esta cosa hace que dibujes solo con mover el cursor    
+    def fastDrawModeToogle(self):
+        self.fastDrawMode = not self.fastDrawMode
+        self.curse.curse = '☼' if self.fastDrawMode else '○'
+        if self.fastDrawMode:
+            self.drawTile()
+            
+    # Cuando dibujas, se ejecuta esta funcion    
+    def fastDraw(self, *args, **kwargs):
+        if self.fastDrawMode:
+            self.drawTile()

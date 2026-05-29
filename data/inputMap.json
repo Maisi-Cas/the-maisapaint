@@ -1,0 +1,18 @@
+{
+    "w" : "up",
+    "a" : "left",
+    "s" : "down",
+    "d" : "right",
+    "j" : "accept",
+    "k" : "cancel",
+    "i" : "extra-0",
+    "y" : "exit",
+    "f" : "toogle",
+
+    "q" : "alt-left",
+    "e" : "alt-right",
+
+    "z" : "extra-1",
+    "x" : "extra-2",
+    "c" : "extra-3"
+}
