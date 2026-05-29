@@ -1,2 +1,2 @@
-# the-maisapaint
+# THE-Maisapaint
 Un pedazo de  paint de CMD hecho como pasatiempo
