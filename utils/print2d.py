@@ -18,7 +18,7 @@ class Print2D:
     def clear():
         os.system('cls')
         
-    def debugPrint(self, string: str):
-        self.clear()
+    def debugPrint(string: str):
+        os.system('cls')
         print(string)
         msvcrt.getch()

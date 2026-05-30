@@ -20,7 +20,7 @@ class TileSelector:
             self.count = 1
             
         self.currenTile = 0
-        self.tiles = [Tile(rand.randint(0, len(graph.ForeColors) - 1), x if x < len(graph.ForeColors) else x - (x + (1 // len(graph.ForeColors)) * len(graph.ForeColors)) , 15, 1) for x in range(self.count)]
+        self.tiles = [Tile(graph.Characters[rand.randint(0, len(graph.ForeColors) - 1)]["character"], x if x < len(graph.ForeColors) else x - (x + (1 // len(graph.ForeColors)) * len(graph.ForeColors)) , 15, 1) for x in range(self.count)]
         self.panel = Panel(
             'Selector de Tiles',
             2,

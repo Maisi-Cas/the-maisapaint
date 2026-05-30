@@ -14,7 +14,7 @@ import engine.graph as graph
 from engine.tile import Tile
 from engine.curse import Curse
 from engine.panel import Panel
-from engine.draw import Draw
+from engine.layer import Layer, LayerMaster
 from engine.table import Table
 
 # Clases del nucleo
@@ -66,7 +66,7 @@ class Maisapaint:
     class KeyTable:
         def __init__(self, position: Vector2):
             self.table = Table("Controles", 5, position.copy(), 2, 20)
-            self.table.setColSize([8,16])
+            self.table.setColSize([9,16])
             self.table.setColors([7],[3,11])
             self.table.setHeadings("Tecla", "Accion")
             self.valueDict = {
@@ -78,6 +78,7 @@ class Maisapaint:
                     ["F", "MODO SELECCION"],
                     ["Z", "LIMPIAR DIBUJO"],
                     ["X", "ALTERNAR DIBUJO RAPIDO"],
+                    ["I", "OCULTAR CURSOR"],
                     ["Y", "SALIR"]
                     
                 ],
@@ -109,7 +110,7 @@ class Maisapaint:
         def render(self):
             self.table.show()
                     
-          
+        
     def __init__(self):
         self.canRun = True
         self.fastDrawMode = False
@@ -164,7 +165,7 @@ class Maisapaint:
         # Otras cosas
         
         self.clock = Clock(Vector2(self.selectorPanel.margin.x + 23, self.selectorPanel.margin.y + 6)) # Reloj
-        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, 1)
+        self.selectorPanelTile = Tile(graph.Characters[self.selectors[1].currentId]["character"], self.selectors[0].currentId, self.selectors[2].currentId, 1)
         self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
         """
             A ver, abro esto para explicar algo sobre [self.SelectorPanelTile:Tile] y de [self.SelectorPanel.title:str]
@@ -173,14 +174,22 @@ class Maisapaint:
             [self.SelectorPanel.title] : Pone el tile en el titulo, algo asi [$]Selectores
         """
         
-        # Curse y Draw, sin estos 2 papasotes, no hay dibujo
+        # Curse y Layer, sin estos 2 papasotes, no hay dibujo
         self.curse = Curse(
             self.mainpanel.margin.copy(),
             self.mainpanel.size.copy(),
             Vector2(self.mainpanel.size.x // 2, self.mainpanel.size.y // 2)
         )
         self.curse.colorId = self.tileSelector.tiles[self.tileSelector.currenTile].foreColorId
-        self.draw = Draw(Vector2(self.mainpanel.margin.x + 1, self.mainpanel.margin.y + 1), self.mainpanel.size.copy())
+        self.draw = Layer(Vector2(self.mainpanel.margin.x + 1, self.mainpanel.margin.y + 1), self.mainpanel.size.copy())
+        self.layermaster = LayerMaster(
+            11,
+            Vector2(
+                self.splashtext.size.x + self.mainpanel.size.x + 6,
+                2
+            ),
+            Vector2(21,10)
+        )
         
         # Conectar señales
         bus.conect('draw-tile', self.drawTile)
@@ -194,7 +203,7 @@ class Maisapaint:
         bus.conect('slct-tile', self.updateCurse)
         bus.conect('move-curse', self.fastDraw)
         bus.conect('fast-mode', self.fastDrawModeToogle)
-       
+
     # region Run  
     # Funcion que corre el programa    
     def run(self):
@@ -219,6 +228,7 @@ class Maisapaint:
                         for i in self.selectors:
                             i.render()
                         self.draw.render()
+                        self.layermaster.render()
                         self.curse.render()
                         self.clock.render()
                         
@@ -269,7 +279,7 @@ class Maisapaint:
         self.selectors[self.currentSelector].colorId = 2 # Deja el selector selccionado (XD) de color dorado
         
         # Y ya se aplican los cambios al selector de tiles
-        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
+        self.selectorPanelTile = Tile(graph.Characters[self.selectors[1].currentId]["character"], self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
         self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
     
     # Agrega un tile a la clase dibujo, tomando el tile del tileSelector y las posision del cusror                
@@ -324,7 +334,7 @@ class Maisapaint:
     def custimizeChar(self):
         self.selectors[1].customize() # Customización
         # Actualizar el selectorPanel ozy
-        self.selectorPanelTile = Tile(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, 1)
+        self.selectorPanelTile = Tile(graph.Characters[self.selectors[1].currentId]["character"], self.selectors[0].currentId, self.selectors[2].currentId, 1)
         self.selectorPanel.title = f"[{self.selectorPanelTile}{graph.ForeColors[self.selectorPanel.colorId]['color']}]Selectores"
         
         print2d.clear() # Lo que nunca hacer, ya bañate w
@@ -333,7 +343,7 @@ class Maisapaint:
     # usando los valores del selector de valores, aunque le digo selectores    
     def changeTile(self):
         #Mucho texto
-        self.tileSelector.change(self.selectors[1].currentId, self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
+        self.tileSelector.change(graph.Characters[self.selectors[1].currentId]["character"], self.selectors[0].currentId, self.selectors[2].currentId, self.selectors[3].currentId)
         self.curse.colorId = self.tileSelector.tiles[self.tileSelector.currenTile].foreColorId
         bus.emit('state-change', states.States.DRAW) # Cambia el estado a DIBUJO cuando termina
     

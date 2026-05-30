@@ -58,7 +58,7 @@ class CharacterSelector:
     def render(self):
         self.panel.colorId = self.colorId
         self.panel.title = f"[{graph.Characters[self.currentId]['character']}]{self.title}"
-       
+        
         
         for i in range(len(self.ids)):
             print2d.coord(self.position.x + i, self.position.y, ' ')

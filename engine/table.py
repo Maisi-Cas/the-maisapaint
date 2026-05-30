@@ -62,7 +62,7 @@ class Table:
         self._content = []
             
     def show(self):
-        getStringSize = lambda string, x: (len(string) // x) + 1 if (len(string) % x > 0) else 0
+        getStringSize = lambda string, x: (len(string) // x) + 1 if (len(string) % x > 0) else 1
         deltaSizeX = 0
         deltaSizeY = 0
         actualStringSize = 0
@@ -106,6 +106,7 @@ class Table:
                 
             deltaSizeY += chichis
             deltaSizeX = 0
+            chichis = 0
             
         deltaSizeX = sum(self._sizes["cols"])
         
@@ -114,12 +115,11 @@ class Table:
         
         panel = Panel(self.title, self.colorId, self.margin - 1, Vector2(deltaSizeX, deltaSizeY))
         panel.render()
-        print2d.coord(8,2, '')
         
         
         
                    
-"""
+""""
 Diagrama de como funciona
 -------------------------
 Obtiene la lista de encabezados
